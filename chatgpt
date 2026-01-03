@@ -633,9 +633,6 @@ local function startVehicleFly(speed)
     local char = LocalPlayer.Character
     if not char then setOutput("Персонаж не найден.") return end
     
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then setOutput("HumanoidRootPart не найден.") return end
-    
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not humanoid or not humanoid.SeatPart then 
         setOutput("Ты не сидишь в машине.") 
@@ -643,28 +640,32 @@ local function startVehicleFly(speed)
     end
     
     local vehicle = humanoid.SeatPart.Parent
-    while vehicle and vehicle.Parent and not vehicle:IsDescendantOf(workspace) do
-        vehicle = vehicle.Parent
-    end
+    local primaryPart = vehicle.PrimaryPart or vehicle:FindFirstChildOfClass("Part")
     
-    if not vehicle then setOutput("Машина не найдена.") return end
+    if not primaryPart then setOutput("Не могу найти основную часть машины.") return end
     
     vehicleFlySpeed = speed or vehicleFlySpeed
     isVehicleFlying = true
 
     if vehicleFlyConnection then vehicleFlyConnection:Disconnect() end
 
-    local bodyVel = Instance.new("BodyVelocity")
-    bodyVel.Name = "knzxVehicleFlyVel"
-    bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bodyVel.Velocity = Vector3.new(0, 0, 0)
-    bodyVel.Parent = root
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Name = "VehicleFlyVel"
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.Parent = primaryPart
 
     vehicleFlyConnection = RunService.RenderStepped:Connect(function()
         if not isVehicleFlying then
-            bodyVel:Destroy()
-            vehicleFlyConnection:Disconnect()
-            vehicleFlyConnection = nil
+            if bodyVelocity then bodyVelocity:Destroy() end
+            if vehicleFlyConnection then vehicleFlyConnection:Disconnect() end
+            return
+        end
+
+        local char2 = LocalPlayer.Character
+        if not char2 then return end
+        local hum2 = char2:FindFirstChildOfClass("Humanoid")
+        if not hum2 or not hum2.SeatPart then
+            stopVehicleFly()
             return
         end
 
@@ -694,7 +695,7 @@ local function startVehicleFly(speed)
             moveDir = moveDir.Unit
         end
 
-        bodyVel.Velocity = moveDir * vehicleFlySpeed
+        bodyVelocity.Velocity = moveDir * vehicleFlySpeed
     end)
 
     setOutput("Vehicle Fly ON, speed = "..tostring(vehicleFlySpeed))
@@ -704,11 +705,12 @@ local function stopVehicleFly()
     isVehicleFlying = false
     local char = LocalPlayer.Character
     if char then
-        local vehicle = char.Parent:FindFirstChild(LocalPlayer.Name.."'s Car") or char.Parent:FindFirstChildOfClass("Model")
-        if vehicle then
-            local root = vehicle:FindFirstChild("Body") or vehicle:FindFirstChildOfClass("Part")
-            if root then
-                local bv = root:FindFirstChild("knzxVehicleFlyVel")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.SeatPart then
+            local vehicle = humanoid.SeatPart.Parent
+            local primaryPart = vehicle.PrimaryPart or vehicle:FindFirstChildOfClass("Part")
+            if primaryPart then
+                local bv = primaryPart:FindFirstChild("VehicleFlyVel")
                 if bv then bv:Destroy() end
             end
         end
