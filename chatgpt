@@ -1,0 +1,746 @@
+-- knzxCMD v4 (resize + toggle key)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+-- === ЛОГ ВНУТРИ МЕНЮ ===
+local logLines = {}
+local maxLogLines = 60
+local LogLabel
+local LogScrolling
+
+local function updateLogLabel()
+    if not LogLabel or not LogScrolling then return end
+    LogLabel.Text = table.concat(logLines, "\n")
+    LogLabel.Size = UDim2.new(1, -4, 0, LogLabel.TextBounds.Y + 4)
+    LogScrolling.CanvasSize = UDim2.new(0, 0, 0, LogLabel.TextBounds.Y + 8)
+end
+
+local function addLog(text)
+    table.insert(logLines, os.date("[%H:%M:%S] ") .. text)
+    if #logLines > maxLogLines then
+        table.remove(logLines, 1)
+    end
+    updateLogLabel()
+end
+
+local function setOutput(text)
+    print("[knzxCMD] "..text)
+    addLog(text)
+end
+
+-- === УВЕДОМЛЕНИЕ ПРИ ЗАПУСКЕ ===
+local function showStartupNotification()
+    local notifGui = Instance.new("ScreenGui")
+    notifGui.Name = "knzxCMD_Notification"
+    notifGui.ResetOnSpawn = false
+    notifGui.IgnoreGuiInset = true
+    notifGui.Parent = game.CoreGui
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 260, 0, 60)
+    frame.Position = UDim2.new(1, 20, 1, 20)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+    frame.BorderSizePixel = 0
+    frame.BackgroundTransparency = 0.1
+    frame.Parent = notifGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -16, 0, 24)
+    title.Position = UDim2.new(0, 8, 0, 6)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextColor3 = Color3.fromRGB(235, 235, 240)
+    title.Text = "knzxCMD v1 - Loaded"
+    title.Parent = frame
+
+    local desc = Instance.new("TextLabel")
+    desc.Size = UDim2.new(1, -16, 0, 20)
+    desc.Position = UDim2.new(0, 8, 0, 32)
+    desc.BackgroundTransparency = 1
+    desc.Font = Enum.Font.Gotham
+    desc.TextSize = 14
+    desc.TextXAlignment = Enum.TextXAlignment.Left
+    desc.TextColor3 = Color3.fromRGB(200, 200, 210)
+    desc.Text = "Enjoy game)"
+    desc.Parent = frame
+
+    local tweenIn = TweenService:Create(
+        frame,
+        TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Position = UDim2.new(1, -280, 1, -80)}
+    )
+    tweenIn:Play()
+
+    task.delay(3, function()
+        local tweenOut = TweenService:Create(
+            frame,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Position = UDim2.new(1, 20, 1, 20), BackgroundTransparency = 1}
+        )
+        tweenOut:Play()
+        tweenOut.Completed:Wait()
+        notifGui:Destroy()
+    end)
+end
+
+-- === UI ===
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "knzxCMD"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.CoreGui
+
+showStartupNotification()
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.new(0, 420, 0, 220)
+Main.Position = UDim2.new(0.5, -210, 0.5, -110)
+Main.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = Main
+
+-- масштабирование (– / +)
+local baseSize = Vector2.new(420, 220)
+local minScale = 0.6
+local maxScale = 1.4
+local currentScale = 1.0
+
+local function applyScale()
+    local newSize = baseSize * currentScale
+    Main.Size = UDim2.new(0, newSize.X, 0, newSize.Y)
+    Main.Position = UDim2.new(0.5, -newSize.X/2, 0.5, -newSize.Y/2)
+end
+
+-- === TopBar ===
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 26)
+TopBar.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = Main
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -120, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextColor3 = Color3.fromRGB(235, 235, 240)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Text = "knzxCMD"
+Title.Parent = TopBar
+
+-- кнопки масштаба
+local MinusButton = Instance.new("TextButton")
+MinusButton.Size = UDim2.new(0, 22, 0, 18)
+MinusButton.Position = UDim2.new(1, -96, 0.5, -9)
+MinusButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+MinusButton.BorderSizePixel = 0
+MinusButton.Font = Enum.Font.GothamBold
+MinusButton.TextSize = 14
+MinusButton.Text = "-"
+MinusButton.TextColor3 = Color3.fromRGB(230, 230, 240)
+MinusButton.Parent = TopBar
+local MinusCorner = Instance.new("UICorner")
+MinusCorner.CornerRadius = UDim.new(0, 4)
+MinusCorner.Parent = MinusButton
+
+local PlusButton = Instance.new("TextButton")
+PlusButton.Size = UDim2.new(0, 22, 0, 18)
+PlusButton.Position = UDim2.new(1, -68, 0.5, -9)
+PlusButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+PlusButton.BorderSizePixel = 0
+PlusButton.Font = Enum.Font.GothamBold
+PlusButton.TextSize = 14
+PlusButton.Text = "+"
+PlusButton.TextColor3 = Color3.fromRGB(230, 230, 240)
+PlusButton.Parent = TopBar
+local PlusCorner = Instance.new("UICorner")
+PlusCorner.CornerRadius = UDim.new(0, 4)
+PlusCorner.Parent = PlusButton
+
+local SettingsButton = Instance.new("TextButton")
+SettingsButton.Size = UDim2.new(0, 26, 0, 18)
+SettingsButton.Position = UDim2.new(1, -36, 0.5, -9)
+SettingsButton.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+SettingsButton.BorderSizePixel = 0
+SettingsButton.Font = Enum.Font.GothamBold
+SettingsButton.TextSize = 14
+SettingsButton.Text = "≡"
+SettingsButton.TextColor3 = Color3.fromRGB(230, 230, 240)
+SettingsButton.Parent = TopBar
+local SettingsCorner = Instance.new("UICorner")
+SettingsCorner.CornerRadius = UDim.new(0, 4)
+SettingsCorner.Parent = SettingsButton
+
+-- === Content ===
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -16, 1, -38)
+Content.Position = UDim2.new(0, 8, 0, 30)
+Content.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+Content.BorderSizePixel = 0
+Content.Parent = Main
+local ContentCorner = Instance.new("UICorner")
+ContentCorner.CornerRadius = UDim.new(0, 6)
+ContentCorner.Parent = Content
+
+-- лог
+local LogFrame = Instance.new("Frame")
+LogFrame.Size = UDim2.new(0.7, -8, 1, -40)
+LogFrame.Position = UDim2.new(0, 6, 0, 6)
+LogFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+LogFrame.BorderSizePixel = 0
+LogFrame.Parent = Content
+local LogCornerUI = Instance.new("UICorner")
+LogCornerUI.CornerRadius = UDim.new(0, 4)
+LogCornerUI.Parent = LogFrame
+
+local LogTitle = Instance.new("TextLabel")
+LogTitle.Size = UDim2.new(1, -10, 0, 18)
+LogTitle.Position = UDim2.new(0, 5, 0, 3)
+LogTitle.BackgroundTransparency = 1
+LogTitle.Font = Enum.Font.GothamBold
+LogTitle.TextSize = 14
+LogTitle.TextColor3 = Color3.fromRGB(200, 200, 220)
+LogTitle.TextXAlignment = Enum.TextXAlignment.Left
+LogTitle.Text = "Log"
+LogTitle.Parent = LogFrame
+
+LogScrolling = Instance.new("ScrollingFrame")
+LogScrolling.Size = UDim2.new(1, -10, 1, -26)
+LogScrolling.Position = UDim2.new(0, 5, 0, 22)
+LogScrolling.BackgroundTransparency = 1
+LogScrolling.BorderSizePixel = 0
+LogScrolling.ScrollBarThickness = 4
+LogScrolling.CanvasSize = UDim2.new(0,0,0,0)
+LogScrolling.Parent = LogFrame
+
+LogLabel = Instance.new("TextLabel")
+LogLabel.Size = UDim2.new(1, -4, 0, 0)
+LogLabel.Position = UDim2.new(0, 2, 0, 0)
+LogLabel.BackgroundTransparency = 1
+LogLabel.Font = Enum.Font.Code
+LogLabel.TextSize = 13
+LogLabel.TextColor3 = Color3.fromRGB(210, 210, 220)
+LogLabel.TextXAlignment = Enum.TextXAlignment.Left
+LogLabel.TextYAlignment = Enum.TextYAlignment.Top
+LogLabel.TextWrapped = false
+LogLabel.Text = ""
+LogLabel.Parent = LogScrolling
+
+updateLogLabel()
+
+-- настройки справа
+local SettingsFrame = Instance.new("Frame")
+SettingsFrame.Size = UDim2.new(0.3, -10, 1, -40)
+SettingsFrame.Position = UDim2.new(0.7, 4, 0, 6)
+SettingsFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+SettingsFrame.BorderSizePixel = 0
+SettingsFrame.Parent = Content
+local SettingsFrameCorner = Instance.new("UICorner")
+SettingsFrameCorner.CornerRadius = UDim.new(0, 4)
+SettingsFrameCorner.Parent = SettingsFrame
+
+local SettingsTitle = Instance.new("TextLabel")
+SettingsTitle.Size = UDim2.new(1, -10, 0, 18)
+SettingsTitle.Position = UDim2.new(0, 5, 0, 3)
+SettingsTitle.BackgroundTransparency = 1
+SettingsTitle.Font = Enum.Font.GothamBold
+SettingsTitle.TextSize = 14
+SettingsTitle.TextColor3 = Color3.fromRGB(200, 200, 220)
+SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+SettingsTitle.Text = "Settings"
+SettingsTitle.Parent = SettingsFrame
+
+local UnloadButton = Instance.new("TextButton")
+UnloadButton.Size = UDim2.new(1, -10, 0, 22)
+UnloadButton.Position = UDim2.new(0, 5, 0, 26)
+UnloadButton.BackgroundColor3 = Color3.fromRGB(60, 40, 40)
+UnloadButton.BorderSizePixel = 0
+UnloadButton.Font = Enum.Font.Gotham
+UnloadButton.TextSize = 14
+UnloadButton.TextColor3 = Color3.fromRGB(255, 230, 230)
+UnloadButton.Text = "Unload script"
+UnloadButton.Parent = SettingsFrame
+local UnloadCorner = Instance.new("UICorner")
+UnloadCorner.CornerRadius = UDim.new(0, 4)
+UnloadCorner.Parent = UnloadButton
+
+local HelpLabel = Instance.new("TextLabel")
+HelpLabel.Size = UDim2.new(1, -10, 0, 40)
+HelpLabel.Position = UDim2.new(0, 5, 0, 52)
+HelpLabel.BackgroundTransparency = 1
+HelpLabel.Font = Enum.Font.Gotham
+HelpLabel.TextSize = 13
+HelpLabel.TextColor3 = Color3.fromRGB(210, 210, 220)
+HelpLabel.TextXAlignment = Enum.TextXAlignment.Left
+HelpLabel.TextYAlignment = Enum.TextYAlignment.Top
+HelpLabel.TextWrapped = true
+HelpLabel.Text = "Use ; to focus input.\nType help to see commands."
+HelpLabel.Parent = SettingsFrame
+
+local CmdBox = Instance.new("TextBox")
+CmdBox.Size = UDim2.new(1, -16, 0, 26)
+CmdBox.Position = UDim2.new(0, 8, 1, -30)
+CmdBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+CmdBox.BorderSizePixel = 0
+CmdBox.Font = Enum.Font.Gotham
+CmdBox.TextSize = 14
+CmdBox.TextColor3 = Color3.fromRGB(235, 235, 240)
+CmdBox.PlaceholderText = "command (e.g. fly 50)"
+CmdBox.Text = ""
+CmdBox.ClearTextOnFocus = false
+CmdBox.Parent = Main
+local CmdCorner = Instance.new("UICorner")
+CmdCorner.CornerRadius = UDim.new(0, 6)
+CmdCorner.Parent = CmdBox
+
+-- === масштаб кнопками ===
+MinusButton.MouseButton1Click:Connect(function()
+    currentScale = math.max(minScale, currentScale - 0.1)
+    applyScale()
+end)
+PlusButton.MouseButton1Click:Connect(function()
+    currentScale = math.min(maxScale, currentScale + 0.1)
+    applyScale()
+end)
+applyScale()
+
+-- === скрытие/показ по клавише (по умолчанию Insert) ===
+local menuToggleKey = Enum.KeyCode.Insert
+
+local function setMenuKey(keyStr)
+    keyStr = string.upper(keyStr)
+    local keyEnum = Enum.KeyCode[keyStr]
+    if not keyEnum then
+        setOutput("Неизвестная клавиша для меню: "..keyStr)
+        return
+    end
+    menuToggleKey = keyEnum
+    setOutput("Menu key = "..keyStr)
+end
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == menuToggleKey then
+        Main.Visible = not Main.Visible
+    end
+end)
+
+SettingsButton.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = not SettingsFrame.Visible
+end)
+
+UnloadButton.MouseButton1Click:Connect(function()
+    setOutput("Скрипт выгружен.")
+    ScreenGui:Destroy()
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.Semicolon then
+        CmdBox:CaptureFocus()
+    end
+end)
+
+-- === ХЕЛПЕРЫ ДЛЯ ПЕРСА ===
+local function getCharAndHumanoid()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    return char, hum
+end
+
+-- === FLY / SPEED / JUMP ===
+local flyConnection
+local isFlying = false
+local flySpeed = 50
+
+local function startFly(speed)
+    local char = LocalPlayer.Character
+    if not char then setOutput("Персонаж не найден.") return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then setOutput("HumanoidRootPart не найден.") return end
+
+    flySpeed = speed or flySpeed
+    isFlying = true
+
+    if flyConnection then flyConnection:Disconnect() end
+
+    local bodyVel = Instance.new("BodyVelocity")
+    bodyVel.Name = "knzxFlyVel"
+    bodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bodyVel.Velocity = Vector3.new(0, 0, 0)
+    bodyVel.Parent = root
+
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not isFlying then
+            bodyVel:Destroy()
+            flyConnection:Disconnect()
+            flyConnection = nil
+            return
+        end
+
+        local moveDir = Vector3.new(0, 0, 0)
+        local cam = workspace.CurrentCamera
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir = moveDir + cam.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir = moveDir - cam.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir = moveDir - cam.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir = moveDir + cam.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDir = moveDir - Vector3.new(0, 1, 0)
+        end
+
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit
+        end
+
+        bodyVel.Velocity = moveDir * flySpeed
+    end)
+
+    setOutput("Fly ON, speed = "..tostring(flySpeed))
+end
+
+local function stopFly()
+    isFlying = false
+    local char = LocalPlayer.Character
+    if char then
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if root then
+            local bv = root:FindFirstChild("knzxFlyVel")
+            if bv then bv:Destroy() end
+        end
+    end
+    setOutput("Fly OFF")
+end
+
+local function setWalkSpeed(spd)
+    local _, hum = getCharAndHumanoid()
+    if hum then
+        hum.WalkSpeed = spd
+        setOutput("WalkSpeed = "..tostring(spd))
+    else
+        setOutput("Humanoid не найден.")
+    end
+end
+
+local function setJumpHeight(h)
+    local _, hum = getCharAndHumanoid()
+    if hum then
+        hum.JumpPower = h
+        setOutput("JumpPower = "..tostring(h))
+    else
+        setOutput("Humanoid не найден.")
+    end
+end
+
+-- === NOCLIP ===
+local noclipConn
+local noclipEnabled = false
+
+local function startNoclip()
+    local char = LocalPlayer.Character
+    if not char then setOutput("Персонаж не найден.") return end
+
+    noclipEnabled = true
+    if noclipConn then noclipConn:Disconnect() end
+
+    noclipConn = RunService.Stepped:Connect(function()
+        if not noclipEnabled then return end
+        local c = LocalPlayer.Character
+        if not c then return end
+        for _, part in ipairs(c:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end)
+
+    setOutput("Noclip ON")
+end
+
+local function stopNoclip()
+    noclipEnabled = false
+    if noclipConn then
+        noclipConn:Disconnect()
+        noclipConn = nil
+    end
+    setOutput("Noclip OFF")
+end
+
+-- === CLICK TP ===
+local clickTpKeyCode = Enum.KeyCode.T
+local clickDown = false
+
+local function setClickTpKey(keyStr)
+    keyStr = string.upper(keyStr)
+    local keyEnum = Enum.KeyCode[keyStr]
+    if not keyEnum then
+        setOutput("Неизвестная клавиша: "..keyStr)
+        return
+    end
+    clickTpKeyCode = keyEnum
+    setOutput("ClickTP key = "..keyStr)
+end
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == clickTpKeyCode then
+        clickDown = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gpe)
+    if input.KeyCode == clickTpKeyCode then
+        clickDown = false
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if clickDown and input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local mouse = LocalPlayer:GetMouse()
+        local hit = mouse.Hit
+        local char = LocalPlayer.Character
+        if char and hit then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.CFrame = CFrame.new(hit.p + Vector3.new(0, 3, 0))
+                setOutput("ClickTP -> "..tostring(hit.p))
+            end
+        end
+    end
+end)
+
+-- === INFINITE JUMP ===
+local infJumpEnabled = false
+local infJumpConn
+
+local function startInfJump()
+    if infJumpEnabled then return end
+    infJumpEnabled = true
+
+    if infJumpConn then
+        infJumpConn:Disconnect()
+        infJumpConn = nil
+    end
+
+    infJumpConn = UserInputService.JumpRequest:Connect(function()
+        if not infJumpEnabled then return end
+        local char = LocalPlayer.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end)
+
+    setOutput("Infinite jump ON")
+end
+
+local function stopInfJump()
+    infJumpEnabled = false
+    if infJumpConn then
+        infJumpConn:Disconnect()
+        infJumpConn = nil
+    end
+    setOutput("Infinite jump OFF")
+end
+
+-- === ESP ===
+local espEnabled = false
+local espObjects = {}
+
+local function clearEsp()
+    for _,objs in pairs(espObjects) do
+        for _,obj in ipairs(objs) do
+            if obj and obj.Parent then obj:Destroy() end
+        end
+    end
+    espObjects = {}
+end
+
+local function createEspForPlayer(plr)
+    if plr == LocalPlayer then return end
+    local char = plr.Character
+    if not char then return end
+
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "knzxESPBox"
+    box.Adornee = char
+    box.AlwaysOnTop = true
+    box.Size = Vector3.new(4, 7, 4)
+    box.ZIndex = 10
+    box.Color3 = Color3.fromRGB(255, 0, 0)
+    box.Transparency = 0.6
+    box.Parent = game.CoreGui
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "knzxESPName"
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0, 200, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = game.CoreGui
+
+    local text = Instance.new("TextLabel")
+    text.BackgroundTransparency = 1
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.Font = Enum.Font.SourceSansBold
+    text.TextSize = 16
+    text.TextColor3 = Color3.fromRGB(255, 0, 0)
+    text.TextStrokeTransparency = 0
+    text.Text = plr.Name
+    text.Parent = billboard
+
+    espObjects[plr] = {box, billboard}
+end
+
+local function startEsp()
+    if espEnabled then return end
+    espEnabled = true
+    clearEsp()
+
+    for _,plr in ipairs(Players:GetPlayers()) do
+        createEspForPlayer(plr)
+    end
+
+    Players.PlayerAdded:Connect(function(plr)
+        plr.CharacterAdded:Connect(function()
+            task.wait(1)
+            if espEnabled then
+                createEspForPlayer(plr)
+            end
+        end)
+    end)
+
+    for _,plr in ipairs(Players:GetPlayers()) do
+        plr.CharacterAdded:Connect(function()
+            task.wait(1)
+            if espEnabled then
+                createEspForPlayer(plr)
+            end
+        end)
+    end
+
+    setOutput("ESP ON")
+end
+
+local function stopEsp()
+    espEnabled = false
+    clearEsp()
+    setOutput("ESP OFF")
+end
+
+-- === ПАРСЕР КОМАНД ===
+local function runCommand(str)
+    local args = {}
+    for word in string.gmatch(str, "%S+") do
+        table.insert(args, word)
+    end
+    local cmd = args[1] and string.lower(args[1]) or nil
+    if not cmd then return end
+
+    if cmd == "fly" then
+        local spd = tonumber(args[2]) or flySpeed
+        if spd < 1 then spd = 1 end
+        startFly(spd)
+
+    elseif cmd == "unfly" or cmd == "nofly" then
+        stopFly()
+
+    elseif cmd == "speed" then
+        local spd = tonumber(args[2]) or 16
+        setWalkSpeed(spd)
+
+    elseif cmd == "jump" then
+        local h = tonumber(args[2]) or 50
+        setJumpHeight(h)
+
+    elseif cmd == "noclip" then
+        startNoclip()
+
+    elseif cmd == "unnoclip" then
+        stopNoclip()
+
+    elseif cmd == "clicktp" and args[2] == "key" then
+        local keyStr = args[3]
+        if not keyStr then
+            setOutput("Использование: clicktp key <клавиша>")
+        else
+            setClickTpKey(keyStr)
+        end
+
+    elseif cmd == "clicktp" then
+        setOutput("ClickTP активен. Текущая клавиша: "..tostring(clickTpKeyCode.Name))
+
+    elseif cmd == "esp" then
+        startEsp()
+
+    elseif cmd == "unesp" then
+        stopEsp()
+
+    elseif cmd == "infjump" then
+        startInfJump()
+
+    elseif cmd == "uninfjump" then
+        stopInfJump()    
+
+    elseif cmd == "menukey" then
+        local keyStr = args[2]
+        if not keyStr then
+            setOutput("Использование: menukey <клавиша>")
+        else
+            setMenuKey(keyStr)
+        end
+
+    elseif cmd == "help" then
+        setOutput("Команды: fly <speed>, unfly, speed <value>, jump <height>, noclip, unnoclip, clicktp key <KEY>, esp, unesp, menukey <KEY>, help")
+
+    else
+        setOutput("Неизвестная команда: "..cmd)
+    end
+end
+
+CmdBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed and CmdBox.Text ~= "" then
+        local text = CmdBox.Text
+        CmdBox.Text = ""
+        runCommand(text)
+    end
+end)
+
+setOutput("knzxCMD загружен. help - список команд. Menu key: INSERT (menukey <KEY> для смены).")
