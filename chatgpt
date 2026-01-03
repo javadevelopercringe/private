@@ -624,6 +624,88 @@ local function stopInfJump()
     setOutput("Infinite jump OFF")
 end
 
+-- === VEHICLE FLY ===
+local vehicleFlyConnection
+local isVehicleFlying = false
+local vehicleFlySpeed = 50
+
+local function startVehicleFly(speed)
+    local char = LocalPlayer.Character
+    if not char then setOutput("Персонаж не найден.") return end
+    
+    local vehicle = char.Parent:FindFirstChild(LocalPlayer.Name.."'s Car") or char.Parent:FindFirstChildOfClass("Model")
+    if not vehicle then setOutput("Машина не найдена.") return end
+    
+    local root = vehicle:FindFirstChild("Body") or vehicle:FindFirstChildOfClass("Part")
+    if not root then setOutput("Не могу найти часть машины.") return end
+
+    vehicleFlySpeed = speed or vehicleFlySpeed
+    isVehicleFlying = true
+
+    if vehicleFlyConnection then vehicleFlyConnection:Disconnect() end
+
+    local bodyVel = Instance.new("BodyVelocity")
+    bodyVel.Name = "knzxVehicleFlyVel"
+    bodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bodyVel.Velocity = Vector3.new(0, 0, 0)
+    bodyVel.Parent = root
+
+    vehicleFlyConnection = RunService.RenderStepped:Connect(function()
+        if not isVehicleFlying then
+            bodyVel:Destroy()
+            vehicleFlyConnection:Disconnect()
+            vehicleFlyConnection = nil
+            return
+        end
+
+        local moveDir = Vector3.new(0, 0, 0)
+        local cam = workspace.CurrentCamera
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir = moveDir + cam.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir = moveDir - cam.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir = moveDir - cam.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir = moveDir + cam.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDir = moveDir - Vector3.new(0, 1, 0)
+        end
+
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit
+        end
+
+        bodyVel.Velocity = moveDir * vehicleFlySpeed
+    end)
+
+    setOutput("Vehicle Fly ON, speed = "..tostring(vehicleFlySpeed))
+end
+
+local function stopVehicleFly()
+    isVehicleFlying = false
+    local char = LocalPlayer.Character
+    if char then
+        local vehicle = char.Parent:FindFirstChild(LocalPlayer.Name.."'s Car") or char.Parent:FindFirstChildOfClass("Model")
+        if vehicle then
+            local root = vehicle:FindFirstChild("Body") or vehicle:FindFirstChildOfClass("Part")
+            if root then
+                local bv = root:FindFirstChild("knzxVehicleFlyVel")
+                if bv then bv:Destroy() end
+            end
+        end
+    end
+    setOutput("Vehicle Fly OFF")
+end
+
 -- === ESP ===
 local espEnabled = false
 local espObjects = {}
@@ -742,6 +824,14 @@ local function runCommand(str)
 
     elseif cmd == "unnoclip" then
         stopNoclip()
+
+    elseif cmd == "vehiclefly" then
+        local spd = tonumber(args[2]) or 50
+        if spd < 1 then spd = 1 end
+        startVehicleFly(spd)
+
+    elseif cmd == "unvehiclefly" then
+        stopVehicleFly()
 
     elseif cmd == "clicktp" and args[2] == "key" then
         local keyStr = args[3]
