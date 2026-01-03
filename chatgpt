@@ -10,6 +10,7 @@ local HttpService = game:GetService("HttpService")
 local HttpGet = game.HttpGet
 
 -- === ЗАГРУЗЧИК СКРИПТОВ ===
+-- === ЗАГРУЗЧИК СКРИПТОВ ===
 local SCRIPTS = {
     dex = "https://raw.githubusercontent.com/infyy/Dex/main/out.lua",
     inf = "https://raw.githubusercontent.com/infyield/infyield/main/source",
@@ -51,7 +52,6 @@ local function loadScriptFromUrl(scriptName)
 
     setOutput(scriptName.." loaded successfully!")
 end
-
 
 -- === ЛОГ ВНУТРИ МЕНЮ ===
 local logLines = {}
