@@ -822,14 +822,6 @@ local function runCommand(str)
     elseif cmd == "unnoclip" then
         stopNoclip()
 
-    elseif cmd == "vehiclefly" then
-        local spd = tonumber(args[2]) or 50
-        if spd < 1 then spd = 1 end
-        startVehicleFly(spd)
-
-    elseif cmd == "unvehiclefly" then
-        stopVehicleFly()
-
     elseif cmd == "clicktp" and args[2] == "key" then
         local keyStr = args[3]
         if not keyStr then
@@ -848,6 +840,14 @@ local function runCommand(str)
         else
             loadScriptFromUrl(scriptName)
         end
+
+    elseif cmd == "vehiclefly" then
+        local spd = tonumber(args[2]) or 50
+        if spd < 1 then spd = 1 end
+        startVehicleFly(spd)
+
+    elseif cmd == "unvehiclefly" then
+        stopVehicleFly()
 
     elseif cmd == "esp" then
         startEsp()
