@@ -18,7 +18,7 @@ local SCRIPTS = {
 
 local function safeHttpGet(url)
     local ok, result = pcall(function()
-        return HttpGet(game, url)
+        return HttpService:GetAsync(url)
     end)
     if not ok then return nil end
     return result
