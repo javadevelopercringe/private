@@ -633,12 +633,9 @@ local function startVehicleFly(speed)
     local char = LocalPlayer.Character
     if not char then setOutput("Персонаж не найден.") return end
     
-    local vehicle = char.Parent:FindFirstChild(LocalPlayer.Name.."'s Car") or char.Parent:FindFirstChildOfClass("Model")
-    if not vehicle then setOutput("Машина не найдена.") return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then setOutput("HumanoidRootPart не найден.") return end
     
-    local root = vehicle:FindFirstChild("Body") or vehicle:FindFirstChildOfClass("Part")
-    if not root then setOutput("Не могу найти часть машины.") return end
-
     vehicleFlySpeed = speed or vehicleFlySpeed
     isVehicleFlying = true
 
