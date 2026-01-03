@@ -636,6 +636,19 @@ local function startVehicleFly(speed)
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then setOutput("HumanoidRootPart не найден.") return end
     
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid or not humanoid.SeatPart then 
+        setOutput("Ты не сидишь в машине.") 
+        return 
+    end
+    
+    local vehicle = humanoid.SeatPart.Parent
+    while vehicle and vehicle.Parent and not vehicle:IsDescendantOf(workspace) do
+        vehicle = vehicle.Parent
+    end
+    
+    if not vehicle then setOutput("Машина не найдена.") return end
+    
     vehicleFlySpeed = speed or vehicleFlySpeed
     isVehicleFlying = true
 
@@ -643,7 +656,7 @@ local function startVehicleFly(speed)
 
     local bodyVel = Instance.new("BodyVelocity")
     bodyVel.Name = "knzxVehicleFlyVel"
-    bodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bodyVel.Velocity = Vector3.new(0, 0, 0)
     bodyVel.Parent = root
 
