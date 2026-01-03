@@ -6,6 +6,53 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local HttpService = game:GetService("HttpService")
+local HttpGet = game.HttpGet
+
+-- === ЗАГРУЗЧИК СКРИПТОВ ===
+local SCRIPTS = {
+    dex = "https://raw.githubusercontent.com/infyy/Dex/main/out.lua",
+    inf = "https://raw.githubusercontent.com/infyield/infyield/main/source",
+}
+
+local function safeHttpGet(url)
+    local ok, result = pcall(function()
+        return HttpGet(game, url)
+    end)
+    if not ok then return nil end
+    return result
+end
+
+local function loadScriptFromUrl(scriptName)
+    local url = SCRIPTS[string.lower(scriptName)]
+    if not url then
+        setOutput("Unknown script: "..scriptName..". Available: dex, inf")
+        return
+    end
+
+    setOutput("Loading "..scriptName.."...")
+    local code = safeHttpGet(url)
+    if not code then
+        setOutput("Error loading "..scriptName..": HTTP request failed")
+        return
+    end
+
+    local fn, loadErr = loadstring(code)
+    if not fn then
+        setOutput("Loadstring error ("..scriptName.."): "..tostring(loadErr))
+        return
+    end
+
+    local ok, runErr = pcall(fn)
+    if not ok then
+        setOutput("Execute error ("..scriptName.."): "..tostring(runErr))
+        return
+    end
+
+    setOutput(scriptName.." loaded successfully!")
+end
+
+
 -- === ЛОГ ВНУТРИ МЕНЮ ===
 local logLines = {}
 local maxLogLines = 60
@@ -707,6 +754,14 @@ local function runCommand(str)
     elseif cmd == "clicktp" then
         setOutput("ClickTP активен. Текущая клавиша: "..tostring(clickTpKeyCode.Name))
 
+    elseif cmd == "script" then
+        local scriptName = args[2]
+        if not scriptName then
+            setOutput("Использование: script dex | script inf")
+        else
+            loadScriptFromUrl(scriptName)
+        end
+
     elseif cmd == "esp" then
         startEsp()
 
@@ -728,7 +783,7 @@ local function runCommand(str)
         end
 
     elseif cmd == "help" then
-        setOutput("Команды: fly <speed>, unfly, speed <value>, jump <height>, noclip, unnoclip, clicktp key <KEY>, esp, unesp, menukey <KEY>, help")
+          setOutput("Команды: fly <speed>, unfly, speed <value>, jump <height>, noclip, unnoclip, clicktp key <KEY>, infjump, uninfjump, esp, unesp, script dex/inf, menukey <KEY>, help (btw dannoe 4udo kodilos 4erez chatgpt<3")
 
     else
         setOutput("Неизвестная команда: "..cmd)
